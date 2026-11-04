@@ -2,7 +2,7 @@ name: Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, break-html ]
   pull_request:
     branches: [ main ]
 
@@ -15,22 +15,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npx --yes htmlhint index.html
-      - run: |
+
+      # ДЕТЕКТИВ: Показываем, какой файл реально попал на GitHub
+      - name: Debug HTML
+        if: always()
+        run: |
+          echo "=== СОДЕРЖИМОЕ INDEX.HTML ==="
+          cat index.html
+          echo "============================="
+
+      - name: Lint HTML
+        if: always()
+        run: npx --yes htmlhint index.html
+
+      - name: Build Docker image
+        if: always()
+        run: |
+          # Собираем БЕЗ КЭША, чтобы гарантированно взять новый HTML
+          docker build --no-cache -t ghcr.io/skaredin-artemii/skaredinartemii-ci-cd-lab:v1.0 .
+
+      - name: Smoke test container
+        if: always()
+        run: |
+          # Принудительно удаляем локальный образ, чтобы не было путаницы
           docker rmi ghcr.io/skaredin-artemii/skaredinartemii-ci-cd-lab:v1.0 || true
+          
+          # Запускаем контейнер
           docker run -d --name smoke-test -p 8080:80 ghcr.io/skaredin-artemii/skaredinartemii-ci-cd-lab:v1.0
           sleep 3
+          
+          # Показываем, что реально отдает сервер
+          echo "=== ЧТО ОТДАЕТ СЕРВЕР ==="
           curl -s http://localhost:8080
+          echo -e "\n========================"
+          
+          # Если слова "Скаредин" нет - падаем с кодом 1
           curl -sf http://localhost:8080 | grep -q "Скаредин" || exit 1
-      
-      - if: always()
-        run: |
-      - if: always()
-        run: |
-          docker run -d --name smoke-test -p 8080:80 ghcr.io/skaredin-artemii/skaredinartemii-ci-cd-lab:v1.0
-          sleep 3
-          curl -s http://localhost:8080
-          curl -sf http://localhost:8080 | grep -q "Скаредин" || exit 1
+          echo "OK"
+
   release:
     runs-on: ubuntu-latest
     needs: ci
