@@ -1,0 +1,48 @@
+name: Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx --yes htmlhint index.html
+      - run: docker build -t ghcr.io/${{ github.repository }}:v1.0 .
+      - if: always()
+        run: |
+          docker run -d --name smoke-test -p 8080:80 ghcr.io/${{ github.repository }}:v1.0
+          sleep 3
+          curl -sf http://localhost:8080 | grep -q "Скаредин" || exit 1
+          echo "OK"
+  release:
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:v1.0
+
+
+
+
+ 
