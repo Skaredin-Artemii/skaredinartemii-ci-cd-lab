@@ -16,7 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: npx --yes htmlhint index.html
-      - run: docker build -t ghcr.io/skaredin-artemii/skaredinartemii-ci-cd-lab:v1.0 .
+      - run: |
+          docker rmi ghcr.io/skaredin-artemii/skaredinartemii-ci-cd-lab:v1.0 || true
+          docker build --no-cache -t ghcr.io/skaredin-artemii/skaredinartemii-ci-cd-lab:v1.0 .
       
       - if: always()
         run: |
